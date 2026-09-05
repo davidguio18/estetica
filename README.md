@@ -66,13 +66,27 @@ La arquitectura debe permitir incorporar estos módulos sin tener que reconstrui
 * JSON.
 * Validación de DTOs.
 * Manejo centralizado de errores.
-* Guards para autorización.
 * Documentación mediante OpenAPI/Swagger.
 
 ## Testing
 
 Se deberá contemplar desde el inicio:
 
+
+## Bootstrap
+
+Requisitos: Node.js 24 y pnpm 10. Copia `.env.example` como `.env` y configura
+`DATABASE_URL` con la conexión PostgreSQL existente antes de iniciar la API.
+
+```bash
+corepack pnpm install
+corepack pnpm prisma generate
+corepack pnpm start:dev
+```
+
+La API expone `GET /health` y la documentación OpenAPI en `/docs`. La
+introspección del esquema existente se ejecuta explícitamente con
+`corepack pnpm prisma db pull` y requiere una conexión válida.
 * Unit tests.
 * Integration tests.
 * E2E tests para los flujos críticos.
@@ -87,7 +101,6 @@ El proyecto utilizará:
 
 No se implementarán múltiples arquitecturas simultáneamente.
 
-No se busca hacer una mezcla artificial de:
 
 * MVC.
 * Hexagonal.
