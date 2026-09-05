@@ -8,3 +8,6 @@ coverage/
 .env.*
 !.env.example
 prisma/generated/
+
+## Prettier
+.prettierrc
