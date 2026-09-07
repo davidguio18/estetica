@@ -92,6 +92,10 @@ Auth expone `POST /auth/users`, `POST /auth/login` y `POST /auth/refresh`.
 Configura `JWT_ACCESS_SECRET`, `JWT_ACCESS_EXPIRES_IN` y
 `REFRESH_TOKEN_EXPIRES_IN` en `.env`; los refresh tokens se almacenan sólo como
 hashes y se rotan en cada uso.
+
+La autorización RBAC expone `GET /auth/me` y `GET /auth/rbac-check`. El JWT sólo
+transporta identidad; los permisos efectivos se consultan en PostgreSQL en cada
+request mediante la relación usuario, roles, role_permissions y permissions.
 * Unit tests.
 * Integration tests.
 * E2E tests para los flujos críticos.
@@ -322,14 +326,13 @@ La abstracción debe existir cuando aporte:
 
 La base de datos será PostgreSQL.
 
-La primera versión utiliza tres schemas:
+La base de datos PostgreSQL se llama `estetica` y utiliza tres schemas:
 
 ```text
-dra_charlincaro
-│
+estetica
 ├── auth
-├── inventory
-└── audit
+├── audit
+└── inventory
 ```
 
 Esto representa:
@@ -338,8 +341,8 @@ Esto representa:
 1 Database
    │
    ├── auth schema
-   ├── inventory schema
-   └── audit schema
+      ├── audit schema
+      └── inventory schema
 ```
 
 No son tres bases de datos diferentes.

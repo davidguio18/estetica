@@ -11,7 +11,11 @@ import { Argon2PasswordHasher } from './infrastructure/argon2-password-hasher';
 import { JwtAccessTokenSigner } from './infrastructure/jwt-access-token.signer';
 import { PrismaUserRepository } from './infrastructure/prisma-user.repository';
 import { PrismaRefreshTokenService } from './infrastructure/prisma-refresh-token.service';
+import { PrismaUserAuthorizationRepository } from './infrastructure/prisma-user-authorization.repository';
 import { AuthController } from './presentation/auth.controller';
+import { JwtAuthenticationGuard } from './presentation/security/jwt-authentication.guard';
+import { PermissionsGuard } from './presentation/security/permissions.guard';
+import { USER_AUTHORIZATION } from './application/ports/user-authorization.port';
 
 @Module({
   imports: [JwtModule.register({})],
@@ -36,6 +40,12 @@ import { AuthController } from './presentation/auth.controller';
       provide: REFRESH_TOKEN_SERVICE,
       useClass: PrismaRefreshTokenService,
     },
+    {
+      provide: USER_AUTHORIZATION,
+      useClass: PrismaUserAuthorizationRepository,
+    },
+    JwtAuthenticationGuard,
+    PermissionsGuard,
   ],
 })
 export class AuthModule {}

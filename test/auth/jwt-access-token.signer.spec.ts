@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAccessTokenSigner } from '../../src/modules/auth/infrastructure/jwt-access-token.signer';
@@ -29,11 +30,16 @@ describe('JwtAccessTokenSigner', () => {
     });
 
     const result = await signer.sign(user);
+    const [encodedHeader] = result.accessToken.split('.');
+    const header = JSON.parse(Buffer.from(encodedHeader, 'base64url').toString('utf8')) as {
+      alg: string;
+    };
     const payload = await jwtService.verifyAsync(result.accessToken, {
       secret: 'a'.repeat(32),
     });
 
     expect(result.expiresIn).toBe(900);
+    expect(header.alg).toBe('HS256');
     expect(payload).toMatchObject({ sub: 'user-id', username: 'admin' });
     expect(payload).not.toHaveProperty('password');
     expect(payload).not.toHaveProperty('passwordHash');

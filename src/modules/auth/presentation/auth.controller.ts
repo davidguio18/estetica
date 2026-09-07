@@ -1,5 +1,14 @@
-import { Body, Controller, Post, UseFilters } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Post, Req, UseFilters, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { CreateUserUseCase } from '../application/create-user.use-case';
 import { LoginUseCase } from '../application/login.use-case';
 import { RefreshAccessTokenUseCase } from '../application/refresh-access-token.use-case';
@@ -9,6 +18,10 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { AuthDomainExceptionFilter } from './filters/auth-domain-exception.filter';
+import { AuthenticatedUser } from './security/authenticated-user';
+import { JwtAuthenticationGuard } from './security/jwt-authentication.guard';
+import { PermissionsGuard } from './security/permissions.guard';
+import { RequirePermissions } from './security/required-permissions.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -41,4 +54,28 @@ export class AuthController {
   async refresh(@Body() dto: RefreshTokenDto): Promise<AuthenticationResponseDto> {
     return this.refreshAccessTokenUseCase.execute(dto);
   }
+
+  @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get the authenticated user principal' })
+  @ApiOkResponse({ description: 'Public authenticated user identity' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
+  @UseGuards(JwtAuthenticationGuard)
+  me(@Req() request: RequestWithUser): AuthenticatedUser {
+    return request.user;
+  }
+
+  @Get('rbac-check')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verify permission-based authorization' })
+  @ApiOkResponse({ description: 'User has the required permission' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
+  @ApiForbiddenResponse({ description: 'User lacks the required permission' })
+  @UseGuards(JwtAuthenticationGuard, PermissionsGuard)
+  @RequirePermissions('users.read')
+  rbacCheck(): { authorized: boolean } {
+    return { authorized: true };
+  }
 }
+
+type RequestWithUser = Request & { user: AuthenticatedUser };

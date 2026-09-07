@@ -34,6 +34,7 @@ export class JwtAccessTokenSigner implements AccessTokenSigner {
         username: user.username,
       },
       {
+        algorithm: 'HS256',
         secret: this.secret,
         expiresIn: this.expiresIn,
       },
