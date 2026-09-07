@@ -30,7 +30,6 @@ export class InvalidUserError extends Error {
 }
 
 export class User {
-    
   private constructor(private readonly data: UserData) {}
 
   static create(input: CreateUserData): User {
@@ -73,6 +72,30 @@ export class User {
 
   toData(): UserData {
     return { ...this.data };
+  }
+
+  get id(): string | undefined {
+    return this.data.id;
+  }
+
+  get username(): string {
+    return this.data.username;
+  }
+
+  get passwordHash(): string {
+    return this.data.passwordHash;
+  }
+
+  get isActive(): boolean {
+    return this.data.isActive;
+  }
+
+  get lockedUntil(): Date | undefined {
+    return this.data.lockedUntil;
+  }
+
+  get failedLoginAttempts(): number {
+    return this.data.failedLoginAttempts;
   }
 
   toPublicData(): Omit<UserData, 'passwordHash'> {

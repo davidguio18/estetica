@@ -9,6 +9,16 @@ import { User, UserData } from '../domain/user.entity';
 export class PrismaUserRepository implements UserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findById(id: string): Promise<User | null> {
+    const user = await this.prisma.users.findUnique({ where: { id } });
+    return user ? User.restore(this.toDomainData(user)) : null;
+  }
+
+  async findByUsername(username: string): Promise<User | null> {
+    const user = await this.prisma.users.findUnique({ where: { username } });
+    return user ? User.restore(this.toDomainData(user)) : null;
+  }
+
   async existsByUsername(username: string): Promise<boolean> {
     const user = await this.prisma.users.findUnique({
       where: { username },
@@ -46,6 +56,40 @@ export class PrismaUserRepository implements UserRepository {
       }
       throw error;
     }
+  }
+
+  async recordFailedLogin(user: User): Promise<void> {
+    if (!user.id) {
+      return;
+    }
+    await this.prisma.$executeRaw`
+      UPDATE "auth"."users"
+      SET
+        "failed_login_attempts" = "failed_login_attempts" + 1,
+        "locked_until" = CASE
+          WHEN "failed_login_attempts" + 1 >= 5
+            THEN CURRENT_TIMESTAMP + INTERVAL '15 minutes'
+          ELSE "locked_until"
+        END
+      WHERE "id" = ${user.id}
+        AND "is_active" = true
+        AND ("locked_until" IS NULL OR "locked_until" <= CURRENT_TIMESTAMP)
+    `;
+  }
+
+  async recordSuccessfulLogin(user: User, loggedInAt: Date): Promise<User> {
+    if (!user.id) {
+      return user;
+    }
+    const updatedUser = await this.prisma.users.update({
+      where: { id: user.id },
+      data: {
+        failed_login_attempts: 0,
+        locked_until: null,
+        last_login_at: loggedInAt,
+      },
+    });
+    return User.restore(this.toDomainData(updatedUser));
   }
 
   private toDomainData(user: PrismaUser): UserData {

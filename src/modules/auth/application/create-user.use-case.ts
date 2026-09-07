@@ -14,7 +14,6 @@ export interface CreateUserInput {
 
 @Injectable()
 export class CreateUserUseCase {
-    
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
     @Inject(PASSWORD_HASHER) private readonly passwordHasher: PasswordHasher,

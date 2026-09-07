@@ -18,12 +18,17 @@ describe('CreateUserUseCase', () => {
 
   beforeEach(async () => {
     repository = {
+      findById: jest.fn(),
+      findByUsername: jest.fn(),
       existsByUsername: jest.fn().mockResolvedValue(false),
       existsByEmail: jest.fn().mockResolvedValue(false),
       create: jest.fn().mockImplementation(async (user: User) => user),
+      recordFailedLogin: jest.fn(),
+      recordSuccessfulLogin: jest.fn(),
     };
     passwordHasher = {
       hash: jest.fn().mockResolvedValue('argon2id-hash'),
+      verify: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

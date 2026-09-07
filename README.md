@@ -87,6 +87,11 @@ corepack pnpm start:dev
 La API expone `GET /health` y la documentación OpenAPI en `/docs`. La
 introspección del esquema existente se ejecuta explícitamente con
 `corepack pnpm prisma db pull` y requiere una conexión válida.
+
+Auth expone `POST /auth/users`, `POST /auth/login` y `POST /auth/refresh`.
+Configura `JWT_ACCESS_SECRET`, `JWT_ACCESS_EXPIRES_IN` y
+`REFRESH_TOKEN_EXPIRES_IN` en `.env`; los refresh tokens se almacenan sólo como
+hashes y se rotan en cada uso.
 * Unit tests.
 * Integration tests.
 * E2E tests para los flujos críticos.

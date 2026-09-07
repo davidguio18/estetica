@@ -7,4 +7,11 @@ export const environmentValidationSchema = Joi.object({
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['postgresql', 'postgres'] })
     .required(),
+  JWT_ACCESS_SECRET: Joi.string().min(32).required(),
+  JWT_ACCESS_EXPIRES_IN: Joi.string()
+    .pattern(/^\d+\s*[smhd]$/i)
+    .default('15m'),
+  REFRESH_TOKEN_EXPIRES_IN: Joi.string()
+    .pattern(/^\d+\s*[smhd]$/i)
+    .default('7d'),
 });
