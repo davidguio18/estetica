@@ -71,7 +71,7 @@ export class PrismaUserRepository implements UserRepository {
             THEN CURRENT_TIMESTAMP + INTERVAL '15 minutes'
           ELSE "locked_until"
         END
-      WHERE "id" = ${user.id}
+      WHERE "id" = ${user.id}::uuid
         AND "is_active" = true
         AND ("locked_until" IS NULL OR "locked_until" <= CURRENT_TIMESTAMP)
     `;

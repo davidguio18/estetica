@@ -96,6 +96,14 @@ hashes y se rotan en cada uso.
 La autorización RBAC expone `GET /auth/me` y `GET /auth/rbac-check`. El JWT sólo
 transporta identidad; los permisos efectivos se consultan en PostgreSQL en cada
 request mediante la relación usuario, roles, role_permissions y permissions.
+
+Audit expone `GET /audit`, protegido por `audit.read`, con paginación y filtros
+básicos. La escritura es append-only y explícita desde casos de uso. Para
+operaciones críticas futuras, la escritura de negocio y su audit log deberían
+compartir una transacción Prisma mediante una frontera transaccional del caso de
+uso, sin introducir eventos ni colas. El permiso `audit.read` debe existir en la
+base/seed de permisos para que los usuarios autorizados puedan consultar logs;
+esta tarea no modifica esa información.
 * Unit tests.
 * Integration tests.
 * E2E tests para los flujos críticos.

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { AUDIT_LOGGER, AuditLogger } from '../../../shared/ports/audit-logger.port';
 import { InvalidCredentialsError } from './errors/invalid-credentials.error';
 import { ACCESS_TOKEN_SIGNER, AccessTokenSigner } from './ports/access-token-signer.port';
 import { PASSWORD_HASHER, PasswordHasher } from './ports/password-hasher.port';
@@ -25,6 +26,7 @@ export class LoginUseCase {
     @Inject(PASSWORD_HASHER) private readonly passwordHasher: PasswordHasher,
     @Inject(ACCESS_TOKEN_SIGNER) private readonly accessTokenSigner: AccessTokenSigner,
     @Inject(REFRESH_TOKEN_SERVICE) private readonly refreshTokenService: RefreshTokenService,
+    @Inject(AUDIT_LOGGER) private readonly auditLogger: AuditLogger,
   ) {}
 
   async execute(input: LoginInput): Promise<AuthenticationResult> {
@@ -33,18 +35,34 @@ export class LoginUseCase {
 
     if (!user) {
       await this.passwordHasher.verify(DUMMY_PASSWORD_HASH, input.password);
+      await this.auditLogger.record({
+        action: 'LOGIN_FAILED',
+        entityType: 'USER',
+      });
       throw new InvalidCredentialsError();
     }
 
     const now = new Date();
     if (!user.isActive || (user.lockedUntil && user.lockedUntil > now)) {
       await this.passwordHasher.verify(user.passwordHash, input.password);
+      await this.auditLogger.record({
+        userId: user.id ?? null,
+        action: 'LOGIN_FAILED',
+        entityType: 'USER',
+        entityId: user.id ?? null,
+      });
       throw new InvalidCredentialsError();
     }
 
     const passwordMatches = await this.passwordHasher.verify(user.passwordHash, input.password);
     if (!passwordMatches) {
       await this.userRepository.recordFailedLogin(user);
+      await this.auditLogger.record({
+        userId: user.id ?? null,
+        action: 'LOGIN_FAILED',
+        entityType: 'USER',
+        entityId: user.id ?? null,
+      });
       throw new InvalidCredentialsError();
     }
 
@@ -52,6 +70,13 @@ export class LoginUseCase {
     if (!authenticatedUser.id) {
       throw new InvalidCredentialsError();
     }
+
+    await this.auditLogger.record({
+      userId: authenticatedUser.id,
+      action: 'LOGIN',
+      entityType: 'USER',
+      entityId: authenticatedUser.id,
+    });
 
     const accessToken = await this.accessTokenSigner.sign(authenticatedUser);
     const refreshToken = await this.refreshTokenService.issue(authenticatedUser.id);

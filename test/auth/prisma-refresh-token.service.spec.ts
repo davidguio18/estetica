@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../src/shared/database/prisma.service';
 import { RefreshTokenError } from '../../src/modules/auth/application/errors/refresh-token.error';
 import { PrismaRefreshTokenService } from '../../src/modules/auth/infrastructure/prisma-refresh-token.service';
+import { AuditLogger } from '../../src/modules/audit/application/ports/audit-logger.port';
 
 type RefreshTransaction = {
   refresh_tokens: {
@@ -28,6 +29,8 @@ const createPrisma = (transaction: RefreshTransaction): PrismaService =>
     ),
   }) as unknown as PrismaService;
 
+const createAuditLogger = (): jest.Mocked<AuditLogger> => ({ record: jest.fn() });
+
 describe('PrismaRefreshTokenService', () => {
   it('stores only a hash and rotates a valid refresh token', async () => {
     const transaction: RefreshTransaction = {
@@ -46,7 +49,7 @@ describe('PrismaRefreshTokenService', () => {
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'user-id' }]),
     };
     const prisma = createPrisma(transaction);
-    const service = new PrismaRefreshTokenService(prisma, createConfig());
+    const service = new PrismaRefreshTokenService(prisma, createConfig(), createAuditLogger());
 
     const issued = await service.issue('user-id');
     expect(issued.refreshToken).not.toBe(
@@ -64,6 +67,36 @@ describe('PrismaRefreshTokenService', () => {
     );
   });
 
+  it('casts the user id to uuid when locking the user row in the refresh query', async () => {
+    const transaction: RefreshTransaction = {
+      refresh_tokens: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'current-id',
+          user_id: '11111111-1111-4111-8111-111111111111',
+          token_hash: 'stored-hash',
+          expires_at: new Date(Date.now() + 60_000),
+          revoked_at: null,
+          users: { is_active: true },
+        }),
+        create: jest.fn().mockResolvedValue({ id: 'replacement-id' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: '11111111-1111-4111-8111-111111111111' }]),
+    };
+    const service = new PrismaRefreshTokenService(
+      createPrisma(transaction),
+      createConfig(),
+      createAuditLogger(),
+    );
+
+    await service.rotate('old-refresh-token');
+
+    expect(transaction.$queryRaw).toHaveBeenCalled();
+    const [sqlParts, boundUserId] = transaction.$queryRaw.mock.calls[0];
+    expect(sqlParts.join('')).toContain('::uuid');
+    expect(boundUserId).toBe('11111111-1111-4111-8111-111111111111');
+  });
+
   it('revokes active tokens and rejects reuse of a revoked token', async () => {
     const transaction: RefreshTransaction = {
       refresh_tokens: {
@@ -79,9 +112,20 @@ describe('PrismaRefreshTokenService', () => {
       },
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'user-id' }]),
     };
-    const service = new PrismaRefreshTokenService(createPrisma(transaction), createConfig());
+    const auditLogger: jest.Mocked<AuditLogger> = { record: jest.fn() };
+    const service = new PrismaRefreshTokenService(
+      createPrisma(transaction),
+      createConfig(),
+      auditLogger,
+    );
 
     await expect(service.rotate('reused-token')).rejects.toEqual(new RefreshTokenError());
+    expect(auditLogger.record).toHaveBeenCalledWith({
+      userId: 'user-id',
+      action: 'REFRESH_TOKEN_REUSED',
+      entityType: 'USER',
+      entityId: 'user-id',
+    });
     expect(transaction.refresh_tokens.updateMany).toHaveBeenCalledWith({
       where: { user_id: 'user-id', revoked_at: null },
       data: expect.objectContaining({ revoked_at: expect.any(Date) }),
@@ -104,7 +148,11 @@ describe('PrismaRefreshTokenService', () => {
       },
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'user-id' }]),
     };
-    const service = new PrismaRefreshTokenService(createPrisma(transaction), createConfig());
+    const service = new PrismaRefreshTokenService(
+      createPrisma(transaction),
+      createConfig(),
+      createAuditLogger(),
+    );
 
     await expect(service.rotate('expired-token')).rejects.toEqual(new RefreshTokenError());
     expect(transaction.refresh_tokens.create).not.toHaveBeenCalled();
@@ -125,7 +173,11 @@ describe('PrismaRefreshTokenService', () => {
       },
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'inactive-user-id' }]),
     };
-    const service = new PrismaRefreshTokenService(createPrisma(transaction), createConfig());
+    const service = new PrismaRefreshTokenService(
+      createPrisma(transaction),
+      createConfig(),
+      createAuditLogger(),
+    );
 
     await expect(service.rotate('inactive-user-token')).rejects.toEqual(new RefreshTokenError());
     expect(transaction.refresh_tokens.create).not.toHaveBeenCalled();
@@ -140,7 +192,11 @@ describe('PrismaRefreshTokenService', () => {
       },
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'user-id' }]),
     };
-    const service = new PrismaRefreshTokenService(createPrisma(transaction), createConfig());
+    const service = new PrismaRefreshTokenService(
+      createPrisma(transaction),
+      createConfig(),
+      createAuditLogger(),
+    );
 
     await expect(service.rotate('unknown-token')).rejects.toEqual(new RefreshTokenError());
     expect(transaction.refresh_tokens.updateMany).not.toHaveBeenCalled();
@@ -180,7 +236,7 @@ describe('PrismaRefreshTokenService', () => {
         return execution;
       }),
     } as unknown as PrismaService;
-    const service = new PrismaRefreshTokenService(prisma, createConfig());
+    const service = new PrismaRefreshTokenService(prisma, createConfig(), createAuditLogger());
 
     const results = await Promise.allSettled([
       service.rotate('same-token'),

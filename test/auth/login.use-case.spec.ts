@@ -18,6 +18,10 @@ import {
   UserRepository,
 } from '../../src/modules/auth/application/ports/user-repository.port';
 import { User } from '../../src/modules/auth/domain/user.entity';
+import {
+  AUDIT_LOGGER,
+  AuditLogger,
+} from '../../src/modules/audit/application/ports/audit-logger.port';
 
 const createUser = (overrides: Partial<ReturnType<User['toData']>> = {}): User =>
   User.restore({
@@ -39,6 +43,7 @@ describe('LoginUseCase', () => {
   let passwordHasher: jest.Mocked<PasswordHasher>;
   let accessTokenSigner: jest.Mocked<AccessTokenSigner>;
   let refreshTokenService: jest.Mocked<RefreshTokenService>;
+  let auditLogger: jest.Mocked<AuditLogger>;
 
   beforeEach(async () => {
     repository = {
@@ -58,6 +63,7 @@ describe('LoginUseCase', () => {
       issue: jest.fn().mockResolvedValue({ refreshToken: 'refresh', expiresIn: 604800 }),
       rotate: jest.fn(),
     };
+    auditLogger = { record: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,6 +72,7 @@ describe('LoginUseCase', () => {
         { provide: PASSWORD_HASHER, useValue: passwordHasher },
         { provide: ACCESS_TOKEN_SIGNER, useValue: accessTokenSigner },
         { provide: REFRESH_TOKEN_SERVICE, useValue: refreshTokenService },
+        { provide: AUDIT_LOGGER, useValue: auditLogger },
       ],
     }).compile();
     useCase = module.get(LoginUseCase);
@@ -85,6 +92,12 @@ describe('LoginUseCase', () => {
     expect(repository.recordSuccessfulLogin).toHaveBeenCalledWith(user, expect.any(Date));
     expect(accessTokenSigner.sign).toHaveBeenCalledWith(user);
     expect(refreshTokenService.issue).toHaveBeenCalledWith('user-id');
+    expect(auditLogger.record).toHaveBeenCalledWith({
+      userId: 'user-id',
+      action: 'LOGIN',
+      entityType: 'USER',
+      entityId: 'user-id',
+    });
   });
 
   it('returns the same generic error for an unknown username', async () => {
@@ -95,6 +108,10 @@ describe('LoginUseCase', () => {
       new InvalidCredentialsError(),
     );
     expect(repository.recordFailedLogin).not.toHaveBeenCalled();
+    expect(auditLogger.record).toHaveBeenCalledWith({
+      action: 'LOGIN_FAILED',
+      entityType: 'USER',
+    });
   });
 
   it('records the failed attempt so PostgreSQL can atomically lock after the fifth failure', async () => {

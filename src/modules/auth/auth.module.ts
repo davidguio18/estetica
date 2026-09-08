@@ -47,5 +47,12 @@ import { USER_AUTHORIZATION } from './application/ports/user-authorization.port'
     JwtAuthenticationGuard,
     PermissionsGuard,
   ],
+  exports: [
+    JwtModule,
+    JwtAuthenticationGuard,
+    PermissionsGuard,
+    USER_REPOSITORY,
+    USER_AUTHORIZATION,
+  ],
 })
 export class AuthModule {}

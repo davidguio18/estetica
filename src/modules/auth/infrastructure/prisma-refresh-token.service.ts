@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { RefreshTokenError } from '../application/errors/refresh-token.error';
@@ -8,6 +8,7 @@ import {
   RefreshTokenService,
 } from '../application/ports/refresh-token.service.port';
 import { parseDurationSeconds } from './token-duration';
+import { AUDIT_LOGGER, AuditLogger } from '../../../shared/ports/audit-logger.port';
 
 @Injectable()
 export class PrismaRefreshTokenService implements RefreshTokenService {
@@ -16,6 +17,7 @@ export class PrismaRefreshTokenService implements RefreshTokenService {
   constructor(
     private readonly prisma: PrismaService,
     configService: ConfigService,
+    @Inject(AUDIT_LOGGER) private readonly auditLogger: AuditLogger,
   ) {
     this.expiresIn = parseDurationSeconds(
       configService.getOrThrow<string>('REFRESH_TOKEN_EXPIRES_IN'),
@@ -61,7 +63,7 @@ export class PrismaRefreshTokenService implements RefreshTokenService {
       const activeUsers = await transaction.$queryRaw<Array<{ id: string }>>`
         SELECT "id"
         FROM "auth"."users"
-        WHERE "id" = ${currentToken.user_id}
+        WHERE "id" = ${currentToken.user_id}::uuid
         FOR UPDATE
       `;
 
@@ -83,7 +85,7 @@ export class PrismaRefreshTokenService implements RefreshTokenService {
           where: { user_id: currentToken.user_id, revoked_at: null },
           data: { revoked_at: now },
         });
-        return { reused: true as const };
+        return { reused: true as const, userId: currentToken.user_id };
       }
 
       if (!currentToken.users.is_active) {
@@ -122,6 +124,12 @@ export class PrismaRefreshTokenService implements RefreshTokenService {
     });
 
     if (result.reused) {
+      await this.auditLogger.record({
+        userId: result.userId,
+        action: 'REFRESH_TOKEN_REUSED',
+        entityType: 'USER',
+        entityId: result.userId,
+      });
       throw new RefreshTokenError();
     }
 

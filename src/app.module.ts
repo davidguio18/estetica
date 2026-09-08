@@ -23,9 +23,9 @@ import { DatabaseModule } from './shared/database/database.module';
       },
     ]),
     DatabaseModule,
+    AuditModule,
     AuthModule,
     InventoryModule,
-    AuditModule,
   ],
   controllers: [AppController],
   providers: [
