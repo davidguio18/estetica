@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+
 export const AUDIT_LOGGER = Symbol('AUDIT_LOGGER');
 
 export interface AuditLogInput {
@@ -12,4 +14,5 @@ export interface AuditLogInput {
 
 export interface AuditLogger {
   record(input: AuditLogInput): Promise<void>;
+  recordInTransaction?(transaction: Prisma.TransactionClient, input: AuditLogInput): Promise<void>;
 }

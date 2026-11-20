@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { AuditLog } from '../../domain/audit-log.entity';
 
 export const AUDIT_LOG_REPOSITORY = Symbol('AUDIT_LOG_REPOSITORY');
@@ -22,5 +23,6 @@ export interface AuditLogPage {
 
 export interface AuditLogRepository {
   create(auditLog: AuditLog): Promise<void>;
+  createInTransaction?(transaction: Prisma.TransactionClient, auditLog: AuditLog): Promise<void>;
   findMany(filters: AuditLogFilters): Promise<AuditLogPage>;
 }

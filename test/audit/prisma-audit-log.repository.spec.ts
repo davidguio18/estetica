@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../src/shared/database/prisma.service';
 import { PrismaAuditLogRepository } from '../../src/modules/audit/infrastructure/prisma-audit-log.repository';
 import { AuditLog } from '../../src/modules/audit/domain/audit-log.entity';
@@ -49,5 +50,32 @@ describe('PrismaAuditLogRepository', () => {
         take: 10,
       }),
     );
+  });
+
+  it('persists a transactional audit log through the supplied transaction client', async () => {
+    const rootCreate = jest.fn();
+    const transactionCreate = jest.fn().mockResolvedValue(undefined);
+    const prisma = {
+      audit_logs: { create: rootCreate },
+    } as unknown as PrismaService;
+    const transaction = {
+      audit_logs: { create: transactionCreate },
+    } as unknown as Prisma.TransactionClient;
+    const repository = new PrismaAuditLogRepository(prisma);
+    const id = '11111111-1111-4111-8111-111111111111';
+    const log = AuditLog.create({
+      userId: id,
+      action: 'PATIENT_CREATED',
+      entityType: 'PATIENT',
+      entityId: id,
+      newValues: { firstName: 'Ana' },
+    });
+
+    await repository.createInTransaction(transaction, log);
+
+    expect(transactionCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: 'PATIENT_CREATED', entity_id: id }),
+    });
+    expect(rootCreate).not.toHaveBeenCalled();
   });
 });

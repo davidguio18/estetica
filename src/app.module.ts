@@ -8,6 +8,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { DatabaseModule } from './shared/database/database.module';
+import { PatientsModule } from './modules/patients/patients.module';
+import { TreatmentsModule } from './modules/treatments/treatments.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { DatabaseModule } from './shared/database/database.module';
     AuditModule,
     AuthModule,
     InventoryModule,
+    PatientsModule,
+    TreatmentsModule,
   ],
   controllers: [AppController],
   providers: [

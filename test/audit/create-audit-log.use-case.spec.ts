@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { CreateAuditLogUseCase } from '../../src/modules/audit/application/create-audit-log.use-case';
 import {
   AUDIT_LOG_REPOSITORY,
@@ -12,6 +13,7 @@ describe('CreateAuditLogUseCase', () => {
   beforeEach(async () => {
     repository = {
       create: jest.fn().mockResolvedValue(undefined),
+      createInTransaction: jest.fn().mockResolvedValue(undefined),
       findMany: jest.fn(),
     };
     const module: TestingModule = await Test.createTestingModule({
@@ -60,6 +62,24 @@ describe('CreateAuditLogUseCase', () => {
     const values = repository.create.mock.calls[0][0].toData().newValues;
     expect(values).toEqual({ nested: { safe: true } });
     expect(JSON.stringify(values)).not.toMatch(/password|token|secret|hash/i);
+  });
+
+  it('forwards the transaction client and sanitizes values for transactional audit writes', async () => {
+    const transaction = {} as Prisma.TransactionClient;
+
+    await useCase.recordInTransaction(transaction, {
+      userId: '11111111-1111-4111-8111-111111111111',
+      action: 'PATIENT_UPDATED',
+      entityType: 'PATIENT',
+      entityId: '11111111-1111-4111-8111-111111111111',
+      oldValues: { safe: true, passwordHash: 'secret' },
+      newValues: { safe: false, refresh_token: 'secret' },
+    });
+
+    const [usedTransaction, auditLog] = (repository.createInTransaction as jest.Mock).mock.calls[0];
+    expect(usedTransaction).toBe(transaction);
+    expect(auditLog.toData().oldValues).toEqual({ safe: true });
+    expect(auditLog.toData().newValues).toEqual({ safe: false });
   });
 
   it('rejects circular and non-serializable numeric values', async () => {

@@ -14,8 +14,22 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(auditLog: AuditLog): Promise<void> {
+    await this.createWithClient(this.prisma, auditLog);
+  }
+
+  async createInTransaction(
+    transaction: Prisma.TransactionClient,
+    auditLog: AuditLog,
+  ): Promise<void> {
+    await this.createWithClient(transaction, auditLog);
+  }
+
+  private async createWithClient(
+    client: Pick<PrismaService, 'audit_logs'> | Prisma.TransactionClient,
+    auditLog: AuditLog,
+  ): Promise<void> {
     const data = auditLog.toData();
-    await this.prisma.audit_logs.create({
+    await client.audit_logs.create({
       data: {
         user_id: data.userId,
         action: data.action,
